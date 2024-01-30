@@ -1,13 +1,10 @@
 ﻿using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.AspNetCore.Mvc;
-using System.Collections;
-using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
+using StockBacktesting.Models;
 using System.Globalization;
-using System.IO;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using static StockBacktesting.Controllers.StockDataController;
 
 namespace StockBacktesting.Controllers
 {
@@ -15,114 +12,72 @@ namespace StockBacktesting.Controllers
     [Route("api/[controller]")]
     public class StockDataController : ControllerBase
     {
+        private const string CsvFilePath = "output.csv";
+        IEnumerable<StockData> csv = ReadDataFromCsv(CsvFilePath);
 
+        #region public
+
+        #region HttpGet
         [HttpGet]
         public IActionResult GetStockData(string stockId)
         {
-            List<StockData> filteredRecords = new List<StockData>();
 
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-            };
-
-            using (var reader = new StreamReader("output.csv"))
-            using (var csv = new CsvReader(reader, config))
-            {
-                filteredRecords = csv.GetRecords<StockData>()
-                    .Where(r => r.StockId == stockId)
-                    .ToList();
-
-                // 序列化過濾後的紀錄為JSON
-                var json = JsonSerializer.Serialize(filteredRecords, new JsonSerializerOptions { WriteIndented = true });
-                return Ok(json);
-            }
+            var filteredRecords = csv.Where(r => r.StockId == stockId).ToList();
+            var json = JsonSerializer.Serialize(filteredRecords, new JsonSerializerOptions { WriteIndented = true });
+            return Ok(json);
         }
 
         [HttpGet("search/{query}")]
         public IActionResult SearchStocks(string query)
         {
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-            };
+            var matchedStocks = csv.Select(record => record.StockId).Distinct().ToList().Where(s => s.StartsWith(query)).ToList();
 
-            using (var reader = new StreamReader("output.csv"))
-            using (var csv = new CsvReader(reader, config))
-            {
-                var records = csv.GetRecords<StockData>();
-                var uniqueStockIds = records.Select(record => record.StockId).Distinct().ToList();
-                var matchedStocks = uniqueStockIds.Where(s => s.StartsWith(query)).ToList();
-                
-                // 序列化過濾後的紀錄為JSON
-                var json = JsonSerializer.Serialize(matchedStocks, new JsonSerializerOptions { WriteIndented = true });
-                return Ok(json);
-            }
+            // 序列化過濾後的紀錄為JSON
+            var json = JsonSerializer.Serialize(matchedStocks, new JsonSerializerOptions { WriteIndented = true });
+            return Ok(json);
+
         }
 
         [HttpGet("GetCalculateReturn")]
-        public IActionResult GetCalculateReturn(DateTime startDate, DateTime endDate, int specificDay)
+        public IActionResult GetCalculateReturn(string stockId,DateTime startDate, DateTime endDate, int specificDay)
         {
-            List<StockData> filteredRecords = new List<StockData>();
 
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-            };
+            var filteredRecords = csv.Where(r => r.StockId == stockId && r.Date >= startDate && r.Date <= endDate).ToList();
 
-            using (var reader = new StreamReader("output.csv"))
-            using (var csv = new CsvReader(reader, config))
-            {
-                filteredRecords = csv.GetRecords<StockData>()
-                    .Where(r => r.StockId == "2330" && r.Date >= startDate && r.Date <= endDate)
-                    .ToList();
-                var json = JsonSerializer.Serialize(CalculateReturnBySpecificDayOfMonth(filteredRecords, specificDay), new JsonSerializerOptions { WriteIndented = true });
-                return Ok(json);
-            }
+            var json = JsonSerializer.Serialize(CalculateReturnBySpecificDayOfMonth(filteredRecords, specificDay), new JsonSerializerOptions { WriteIndented = true });
+            return Ok(json);
 
         }
 
         [HttpGet("GetCalculateReturnDayOfWeek")]
         public IActionResult GetCalculateReturnByDayOfWeek(DateTime startDate, DateTime endDate, DayOfWeek specificDayOfWeek)
         {
-            List<StockData> filteredRecords = new List<StockData>();
+            var filteredRecords = csv.Where(r => r.StockId == "2330" && r.Date >= startDate && r.Date <= endDate).ToList();
 
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-            };
-
-            using (var reader = new StreamReader("output.csv"))
-            using (var csv = new CsvReader(reader, config))
-            {
-                filteredRecords = csv.GetRecords<StockData>()
-                    .Where(r => r.StockId == "2330" && r.Date >= startDate && r.Date <= endDate)
-                    .ToList();
-                var json = JsonSerializer.Serialize(CalculateReturnBySpecificDayOfWeek(filteredRecords, specificDayOfWeek), new JsonSerializerOptions { WriteIndented = true });
-                return Ok(json);
-            }
+            var json = JsonSerializer.Serialize(CalculateReturnBySpecificDayOfWeek(filteredRecords, specificDayOfWeek), new JsonSerializerOptions { WriteIndented = true });
+            return Ok(json);
 
         }
 
-        public class ReturnData
+        #endregion HttpGet
+
+        #endregion
+
+        #region Private
+
+        #region Method
+
+        private static IEnumerable<StockData> ReadDataFromCsv(string filePath)
         {
-            public ReturnData(double totalInvestment, double finalMarketValue, double totalReturn, double returnRate,int days)
-            {
-                TotalInvestment = totalInvestment;
-                FinalMarketValue = finalMarketValue;
-                TotalReturn = totalReturn;
-                ReturnRate = returnRate;
-                Days = days;
-            }
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture) { HasHeaderRecord = true };
 
-            public double TotalInvestment { get; set; }
-            public double FinalMarketValue { get; set; }
-            public double TotalReturn { get; set; }
-            public double ReturnRate { get; set; }
-            public double Days { get; set; }
+            using var reader = new StreamReader(filePath);
+            using var csv = new CsvReader(reader, config);
 
+            return csv.GetRecords<StockData>().ToList();
 
         }
+
 
         ReturnData CalculateReturnBySpecificDayOfMonth(List<StockData> data, int purchaseDay)
         {
@@ -130,12 +85,8 @@ namespace StockBacktesting.Controllers
             double totalInvestment = 0;
             double investmentPerSpecificDay = 100;
 
-            var startDate = new DateTime(2020, 1, 1);
-            var endDate = new DateTime(2024, 1, 2);
 
-            var filteredData = data.Where(day => day.Date >= startDate && day.Date <= endDate)
-                .OrderBy(day => day.Date)
-                .ToList();
+            var filteredData = data;
 
             int lastMonth = -1;
             bool purchasedThisMonth = false;
@@ -216,23 +167,11 @@ namespace StockBacktesting.Controllers
 
             return new ReturnData(totalInvestment, finalMarketValue, totalReturn, returnRate, filteredData.Count);
         }
+        #endregion Method
+
+        #endregion Private
 
     }
-
-    public class StockData
-    {
-        public DateTime Date { get; set; }
-        public string StockId { get; set; }
-        public int TradingVolume { get; set; }
-        public double TradingMoney { get; set; }
-        public double OpenPrice { get; set; }
-        public double MaxPrice { get; set; }
-        public double MinPrice { get; set; }
-        public double ClosePrice { get; set; }
-        public double Spread { get; set; }
-        public int TradingTurnover { get; set; }
-    }
-
 }
 
 

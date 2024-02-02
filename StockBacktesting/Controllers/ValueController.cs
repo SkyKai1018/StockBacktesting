@@ -1,10 +1,13 @@
-﻿using CsvHelper;
+﻿using System.Globalization;
+using System.Text.Json;
+using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using StockBacktesting.Data;
 using StockBacktesting.Models;
-using System.Globalization;
-using System.Text.Json;
+using System.IO;
+using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 
 namespace StockBacktesting.Controllers
 {
@@ -13,7 +16,16 @@ namespace StockBacktesting.Controllers
     public class StockDataController : ControllerBase
     {
         private const string CsvFilePath = "output.csv";
+
         IEnumerable<StockData> csv = ReadDataFromCsv(CsvFilePath);
+
+
+        private readonly ApplicationDbContext _context;
+
+        public StockDataController(ApplicationDbContext context)
+        {
+            _context = context;
+        }
 
         #region public
 
@@ -21,16 +33,18 @@ namespace StockBacktesting.Controllers
         [HttpGet]
         public IActionResult GetStockData(string stockId)
         {
+            var tradingDatas = _context.TradingDatas.Where(r => r.StockId == int.Parse(stockId)).ToList();
 
-            var filteredRecords = csv.Where(r => r.StockId == stockId).ToList();
-            var json = JsonSerializer.Serialize(filteredRecords, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(tradingDatas, new JsonSerializerOptions { WriteIndented = true });
             return Ok(json);
         }
 
         [HttpGet("search/{query}")]
         public IActionResult SearchStocks(string query)
         {
-            var matchedStocks = csv.Select(record => record.StockId).Distinct().ToList().Where(s => s.StartsWith(query)).ToList();
+            //var matchedStocks = csv.Select(record => record.StockId).Distinct().ToList().Where(s => s.StartsWith(query)).ToList();
+            var matchedStocks = _context.TradingDatas.Select(record => record.StockId.ToString()).Distinct().ToList().Where(s => s.StartsWith(query)).ToList();
+
 
             // 序列化過濾後的紀錄為JSON
             var json = JsonSerializer.Serialize(matchedStocks, new JsonSerializerOptions { WriteIndented = true });
@@ -42,7 +56,7 @@ namespace StockBacktesting.Controllers
         public IActionResult GetCalculateReturn(string stockId,DateTime startDate, DateTime endDate, int specificDay)
         {
 
-            var filteredRecords = csv.Where(r => r.StockId == stockId && r.Date >= startDate && r.Date <= endDate).ToList();
+            var filteredRecords = _context.TradingDatas.Where(r => r.StockId.ToString() == stockId && r.Date >= startDate && r.Date <= endDate).ToList();
 
             var json = JsonSerializer.Serialize(CalculateReturnBySpecificDayOfMonth(filteredRecords, specificDay), new JsonSerializerOptions { WriteIndented = true });
             return Ok(json);
@@ -52,11 +66,87 @@ namespace StockBacktesting.Controllers
         [HttpGet("GetCalculateReturnDayOfWeek")]
         public IActionResult GetCalculateReturnByDayOfWeek(DateTime startDate, DateTime endDate, DayOfWeek specificDayOfWeek)
         {
-            var filteredRecords = csv.Where(r => r.StockId == "2330" && r.Date >= startDate && r.Date <= endDate).ToList();
+            var filteredRecords = _context.TradingDatas.Where(r => r.StockId == 2330 && r.Date >= startDate && r.Date <= endDate).ToList();
 
             var json = JsonSerializer.Serialize(CalculateReturnBySpecificDayOfWeek(filteredRecords, specificDayOfWeek), new JsonSerializerOptions { WriteIndented = true });
             return Ok(json);
 
+        }
+
+        [HttpPost("StartBacktest")]
+        public async Task<IActionResult> StartBacktest([FromBody] BacktestRequest request)
+        {
+            var result = new List<ReturnData>();
+            try
+            {
+                //foreach (var item in request.StockIds)
+                //{
+                //    if (!int.TryParse(item, out int stockId)) continue;
+
+                //    Stopwatch stopwatch = Stopwatch.StartNew();
+
+                //    var stockMatch = _context.Stocks
+                //        .Include(s => s.TradingDatas)
+                //        .Include(s => s.EarningsDistributions)
+                //        .FirstOrDefault(r => r.StockId == stockId);
+                //    stopwatch.Stop();
+                //    Console.WriteLine(stopwatch.Elapsed.TotalSeconds);
+
+                //    stopwatch = Stopwatch.StartNew();
+                //    var stocks = _context.Stocks
+                //        .FromSqlRaw("SELECT * FROM Stocks WHERE StockId = {0}", stockId)
+                //        .Include(s => s.TradingDatas)
+                //        .FirstOrDefault();
+                //    stopwatch.Stop();
+                //    Console.WriteLine(stopwatch.Elapsed.TotalSeconds);
+
+                //    if (stockMatch == null) continue;
+
+                //    var filteredRecords = stockMatch.TradingDatas
+                //        .Where(r => r.Date >= request.StartDate && r.Date <= request.EndDate)
+                //        .ToList();
+
+                //    result.Add(CalculateReturnBySpecificDayOfMonth(filteredRecords, request.SpecificDay));
+                //}
+                foreach (var item in request.StockIds)
+                {
+                    if (!int.TryParse(item, out int stockId)) continue;
+
+                    Stopwatch stopwatch = Stopwatch.StartNew();
+
+                    // 获取匹配的股票，并包括过滤后的TradingDatas和EarningsDistributions
+                    var stockMatch = _context.Stocks
+                        .Where(s => s.StockId == stockId)
+                        .Include(s => s.TradingDatas.Where(td => td.Date >= request.StartDate && td.Date <= request.EndDate))
+                        .Include(s => s.EarningsDistributions.Where(ed => ed.Date >= request.StartDate && ed.Date <= request.EndDate))
+                        .FirstOrDefault();
+
+                    stopwatch.Stop();
+                    Console.WriteLine(stopwatch.Elapsed.TotalSeconds);
+
+                    if (stockMatch == null) continue;
+
+                    var filteredRecords = stockMatch.TradingDatas
+                        .ToList();
+
+                    result.Add(CalculateReturnBySpecificDayOfMonth(filteredRecords, request.SpecificDay));
+                }
+
+                var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
+                return Ok(json);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing your request.");
+            }
+        }
+
+        public class BacktestRequest
+        {
+            public List<string> StockIds { get; set; }
+            public DateTime StartDate { get; set; }
+            public DateTime EndDate { get; set; }
+            public int SpecificDay { get; set; }
         }
 
         #endregion HttpGet
@@ -79,48 +169,56 @@ namespace StockBacktesting.Controllers
         }
 
 
-        ReturnData CalculateReturnBySpecificDayOfMonth(List<StockData> data, int purchaseDay)
+        ReturnData CalculateReturnBySpecificDayOfMonth(List<TradingData> data, int purchaseDay)
         {
-            double totalShares = 0;
-            double totalInvestment = 0;
-            double investmentPerSpecificDay = 100;
-
-
-            var filteredData = data;
-
-            int lastMonth = -1;
-            bool purchasedThisMonth = false;
-            int days = 0;
-
-            foreach (var day in filteredData)
+            try
             {
-                if (day.Date.Month != lastMonth)
+                double totalShares = 0;
+                double totalInvestment = 0;
+                double investmentPerSpecificDay = 100;
+
+                var filteredData = data;
+
+                int lastMonth = -1;
+                bool purchasedThisMonth = false;
+                int days = 0;
+
+                foreach (var day in filteredData)
                 {
-                    // 重置標記，新的一個月
-                    purchasedThisMonth = false;
-                    lastMonth = day.Date.Month;
+                    if (day.Date.Month != lastMonth)
+                    {
+                        // 重置標記，新的一個月
+                        purchasedThisMonth = false;
+                        lastMonth = day.Date.Month;
+                    }
+
+                    if (!purchasedThisMonth && (day.Date.Day >= purchaseDay || day.Date.Month != lastMonth))
+                    {
+                        // 購買操作
+                        double sharesBought = investmentPerSpecificDay / (double)day.OpenPrice;
+                        totalShares += sharesBought;
+                        totalInvestment += investmentPerSpecificDay;
+                        purchasedThisMonth = true; // 標記當月已購買
+                        days++;
+                    }
                 }
 
-                if (!purchasedThisMonth && (day.Date.Day >= purchaseDay || day.Date.Month != lastMonth))
-                {
-                    // 購買操作
-                    double sharesBought = investmentPerSpecificDay / day.OpenPrice;
-                    totalShares += sharesBought;
-                    totalInvestment += investmentPerSpecificDay;
-                    purchasedThisMonth = true; // 標記當月已購買
-                    days++;
-                }
+                double finalMarketValue = totalShares * (double)filteredData.Last().ClosePrice;
+                double totalReturn = finalMarketValue - totalInvestment;
+                double returnRate = (totalReturn / totalInvestment) * 100;
+
+                return new ReturnData(filteredData.First().StockId.ToString(), totalInvestment, finalMarketValue, totalReturn, returnRate, days);
+            }
+            catch (Exception ex)
+            {
+                Console.Write(ex.ToString());
+                return null;
             }
 
-            double finalMarketValue = totalShares * filteredData.Last().ClosePrice;
-            double totalReturn = finalMarketValue - totalInvestment;
-            double returnRate = (totalReturn / totalInvestment) * 100;
-
-            return new ReturnData(totalInvestment, finalMarketValue, totalReturn, returnRate, days);
         }
 
 
-        ReturnData CalculateReturnByDaily(List<StockData> data)
+        ReturnData CalculateReturnByDaily(List<TradingData> data)
         {
             double totalShares = 0;
             double totalInvestment = 0;
@@ -133,19 +231,19 @@ namespace StockBacktesting.Controllers
 
             foreach (var day in filteredData)
             {
-                double sharesBought = investmentPerDay / day.OpenPrice;
+                double sharesBought = investmentPerDay / (double)day.OpenPrice;
                 totalShares += sharesBought;
                 totalInvestment += investmentPerDay;
             }
 
-            double finalMarketValue = totalShares * data.Last().ClosePrice;
+            double finalMarketValue = totalShares * (double)data.Last().ClosePrice;
             double totalReturn = finalMarketValue - totalInvestment;
             double returnRate = (totalReturn / totalInvestment) * 100;
 
             return new ReturnData(totalInvestment, finalMarketValue, totalReturn, returnRate, filteredData.Count);
         }
 
-        ReturnData CalculateReturnBySpecificDayOfWeek(List<StockData> data, DayOfWeek specificDayOfWeek)
+        ReturnData CalculateReturnBySpecificDayOfWeek(List<TradingData> data, DayOfWeek specificDayOfWeek)
         {
             double totalShares = 0;
             double totalInvestment = 0;
@@ -156,12 +254,14 @@ namespace StockBacktesting.Controllers
 
             foreach (var day in filteredData)
             {
-                double sharesBought = investmentPerDay / day.OpenPrice;
+                double sharesBought = investmentPerDay / (double)day.OpenPrice;
                 totalShares += sharesBought;
                 totalInvestment += investmentPerDay;
             }
 
-            double finalMarketValue = totalShares * filteredData.LastOrDefault()?.ClosePrice ?? 0;
+            decimal? lastClosePrice = filteredData.LastOrDefault()?.ClosePrice;
+            decimal totalSharesAsDecimal = (decimal)totalShares;
+            double finalMarketValue = (double)(totalSharesAsDecimal * (lastClosePrice ?? 0m));
             double totalReturn = finalMarketValue - totalInvestment;
             double returnRate = (totalInvestment > 0) ? (totalReturn / totalInvestment) * 100 : 0;
 
@@ -173,5 +273,3 @@ namespace StockBacktesting.Controllers
 
     }
 }
-
-

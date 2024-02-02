@@ -1,94 +1,69 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using StockBacktesting;
-using StockBacktesting.Models;
-using Pomelo.EntityFrameworkCore.MySql;
+using StockBacktesting.Data;
 
 var builder = WebApplication.CreateBuilder(args);
-var configuration = builder.Configuration;
 
-
-// Add services to the container.
-builder.Services.AddControllersWithViews();
-
-// Add Swagger services.
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
-});
+// 注册服务和配置
+ConfigureServices(builder.Services, builder.Configuration);
 
 var app = builder.Build();
 
-//create
-using (var context = new TestConnDB())
-{
-    var newConnection = new Connection { ConnStr = "new_conn_string", Remark = "new_remark" };
-    context.Connection.Add(newConnection);
-    context.SaveChanges();
-}
-
-
-//read
-using (var context = new TestConnDB())
-{
-    var connections = context.Connection.ToList();
-    foreach (var conn in connections)
-    {
-        Console.WriteLine($"ConnStr: {conn.ConnStr}, Remark: {conn.Remark}");
-    }
-}
-
-//update
-using (var context = new TestConnDB())
-{
-    var connection = context.Connection.FirstOrDefault(c => c.ConnectionId == 1); // 假設要更新 ConnectionId 為 1 的記錄
-    if (connection != null)
-    {
-        connection.ConnStr = "updated_conn_string";
-        connection.Remark = "updated_remark";
-        context.SaveChanges();
-    }
-}
-
-//delete
-using (var context = new TestConnDB())
-{
-    var connection = context.Connection.FirstOrDefault(c => c.ConnectionId == 1);
-    if (connection != null) {
-        context.Connection.Remove(connection);
-        context.SaveChanges();
-    }
-
-}
-
-
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
-}
-
-app.UseHttpsRedirection();
-app.UseStaticFiles();
-
-app.UseRouting();
-
-app.UseAuthorization();
-
-// Enable middleware to serve generated Swagger as a JSON endpoint.
-app.UseSwagger();
-
-// Enable middleware to serve swagger-ui (HTML, JS, CSS, etc.),
-// specifying the Swagger JSON endpoint.
-app.UseSwaggerUI(c =>
-{
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
-});
-
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+// 配置HTTP请求管道
+ConfigurePipeline(app);
 
 app.Run();
+
+
+void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+{
+    // Add services to the container.
+    services.AddControllersWithViews();
+
+    // Add Swagger services.
+    services.AddSwaggerGen(c =>
+    {
+        c.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
+    });
+
+    // Add DbContext with MySQL
+    services.AddDbContext<TestConnDBContext>(options =>
+        options.UseMySql(configuration.GetConnectionString("DefaultConnection"),
+        ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))));
+
+    services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseMySql(configuration.GetConnectionString("GcpConnection"),
+        ServerVersion.AutoDetect(configuration.GetConnectionString("GcpConnection"))));
+}
+
+void ConfigurePipeline(WebApplication app)
+{
+    // Configure the HTTP request pipeline.
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseExceptionHandler("/Home/Error");
+        app.UseHsts();
+    }
+
+    app.UseHttpsRedirection();
+    app.UseStaticFiles();
+
+    app.UseRouting();
+
+    app.UseAuthorization();
+
+    // Enable middleware to serve generated Swagger as a JSON endpoint.
+    app.UseSwagger();
+
+    // Enable middleware to serve swagger-ui (HTML, JS, CSS, etc.),
+    // specifying the Swagger JSON endpoint.
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
+    });
+
+    app.MapControllerRoute(
+        name: "default",
+        pattern: "{controller=Home}/{action=Index}/{id?}");
+}

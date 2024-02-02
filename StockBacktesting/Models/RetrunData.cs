@@ -11,7 +11,17 @@ namespace StockBacktesting.Models
             ReturnRate = returnRate;
             Days = days;
         }
+        public ReturnData(string stockId,double totalInvestment, double finalMarketValue, double totalReturn, double returnRate, int days)
+        {
+            StockId = stockId;
+            TotalInvestment = totalInvestment;
+            FinalMarketValue = finalMarketValue;
+            TotalReturn = totalReturn;
+            ReturnRate = returnRate;
+            Days = days;
+        }
 
+        public string StockId { get; set; }
         public double TotalInvestment { get; set; }
         public double FinalMarketValue { get; set; }
         public double TotalReturn { get; set; }

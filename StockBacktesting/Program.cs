@@ -39,9 +39,9 @@ void ConfigureServices(IServiceCollection services, IConfiguration configuration
         //    options.UseMySql(configuration.GetConnectionString("DefaultConnection"),
         //    ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))));
 
-        services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseMySql(configuration.GetConnectionString("GcpConnection"),
-            ServerVersion.AutoDetect(configuration.GetConnectionString("GcpConnection"))));
+        //services.AddDbContext<ApplicationDbContext>(options =>
+        //    options.UseMySql(configuration.GetConnectionString("GcpConnection"),
+        //    ServerVersion.AutoDetect(configuration.GetConnectionString("GcpConnection"))));
     }
     catch (Exception ex)
     {

@@ -1,9 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
-using StockBacktesting;
 using StockBacktesting.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 // 注册服务和配置
 ConfigureServices(builder.Services, builder.Configuration);
@@ -27,6 +29,9 @@ void ConfigureServices(IServiceCollection services, IConfiguration configuration
         c.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
     });
 
+    var serviceProvider = services.BuildServiceProvider();
+    var logger = serviceProvider.GetRequiredService<ILogger<Startup>>();
+
     try
     {
         //// Add DbContext with MySQL
@@ -40,7 +45,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration configuration
     }
     catch (Exception ex)
     {
-        Console.Write("Connect to sql error");
+        logger.LogError(ex, "Connect to SQL error");
     }
 }
 

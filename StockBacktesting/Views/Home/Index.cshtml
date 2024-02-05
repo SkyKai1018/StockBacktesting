@@ -145,14 +145,14 @@
         }
 
         async function fetchStockData(stockId) {
-            const data = await fetchData(`https://localhost:7035/api/StockData?StockId=${stockId}`);
+            const data = await fetchData(`/api/StockData?StockId=${stockId}`);
             if (data) {
                 updateChart(data);
             }
         }
 
         async function fetchCalculateReturn(startDate, endDate, specificDay) {
-            const data = await fetchData(`https://localhost:7035/api/StockData/GetCalculateReturn?startDate=${startDate}&endDate=${endDate}&specificDay=${specificDay}`);
+            const data = await fetchData(`/api/StockData/GetCalculateReturn?startDate=${startDate}&endDate=${endDate}&specificDay=${specificDay}`);
             if (data) {
                 displayReturnData(data);
             }

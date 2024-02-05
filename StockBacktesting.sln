@@ -5,8 +5,6 @@ VisualStudioVersion = 25.0.1706.8
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StockBacktesting", "StockBacktesting\StockBacktesting.csproj", "{0904C43D-9FEA-4F55-8A8C-F23FD3F3FF6E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConvertCsvToDatabase", "ConvertCsvToDatabase\ConvertCsvToDatabase.csproj", "{BC0EFF7E-15CC-4DBF-B3FD-E8EF4D37E163}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -17,10 +15,6 @@ Global
 		{0904C43D-9FEA-4F55-8A8C-F23FD3F3FF6E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0904C43D-9FEA-4F55-8A8C-F23FD3F3FF6E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0904C43D-9FEA-4F55-8A8C-F23FD3F3FF6E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BC0EFF7E-15CC-4DBF-B3FD-E8EF4D37E163}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BC0EFF7E-15CC-4DBF-B3FD-E8EF4D37E163}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BC0EFF7E-15CC-4DBF-B3FD-E8EF4D37E163}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BC0EFF7E-15CC-4DBF-B3FD-E8EF4D37E163}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

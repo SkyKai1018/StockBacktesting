@@ -27,14 +27,21 @@ void ConfigureServices(IServiceCollection services, IConfiguration configuration
         c.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
     });
 
-    // Add DbContext with MySQL
-    services.AddDbContext<TestConnDBContext>(options =>
-        options.UseMySql(configuration.GetConnectionString("DefaultConnection"),
-        ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))));
+    try
+    {
+        //// Add DbContext with MySQL
+        //services.AddDbContext<TestConnDBContext>(options =>
+        //    options.UseMySql(configuration.GetConnectionString("DefaultConnection"),
+        //    ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))));
 
-    services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseMySql(configuration.GetConnectionString("GcpConnection"),
-        ServerVersion.AutoDetect(configuration.GetConnectionString("GcpConnection"))));
+        services.AddDbContext<ApplicationDbContext>(options =>
+            options.UseMySql(configuration.GetConnectionString("GcpConnection"),
+            ServerVersion.AutoDetect(configuration.GetConnectionString("GcpConnection"))));
+    }
+    catch (Exception ex)
+    {
+        Console.Write("Connect to sql error");
+    }
 }
 
 void ConfigurePipeline(WebApplication app)
